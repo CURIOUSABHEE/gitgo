@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
+import { useSession } from "next-auth/react"
 import {
   Github,
   FileText,
@@ -10,6 +11,7 @@ import {
   Terminal,
 } from "lucide-react"
 import { Progress } from "@/components/ui/progress"
+import { GitHubAPI } from "@/lib/github"
 
 const languages = [
   { name: "TypeScript", color: "bg-blue-500" },
@@ -31,12 +33,58 @@ const skills = [
 ]
 
 export function OnboardingFlow() {
+  const { data: session } = useSession()
   const [currentStep, setCurrentStep] = useState(0)
   const [progress, setProgress] = useState(0)
   const [detectedLanguages, setDetectedLanguages] = useState<string[]>([])
   const [extractedSkills, setExtractedSkills] = useState<string[]>([])
   const [matchCount, setMatchCount] = useState(0)
+  const [actualRepoCount, setActualRepoCount] = useState(0)
+  const [isLoadingGitHub, setIsLoadingGitHub] = useState(false)
   const router = useRouter()
+
+  // Fetch real GitHub data
+  useEffect(() => {
+    const fetchGitHubData = async () => {
+      if (!session?.accessToken) return
+      
+      setIsLoadingGitHub(true)
+      try {
+        const github = new GitHubAPI(session.accessToken)
+        const repos = await github.getRepos()
+        
+        // Store actual repo count
+        setActualRepoCount(repos.length)
+        
+        // Extract unique languages from repos
+        const languageSet = new Set<string>()
+        repos.forEach(repo => {
+          if (repo.language) languageSet.add(repo.language)
+        })
+        
+        // Convert to array and limit to 5 unique languages
+        const uniqueLanguages = Array.from(languageSet).slice(0, 5)
+        
+        // Simulate progressive language detection
+        for (let i = 0; i < uniqueLanguages.length; i++) {
+          setTimeout(() => {
+            setDetectedLanguages(prev => {
+              // Ensure no duplicates when adding
+              if (prev.includes(uniqueLanguages[i])) return prev
+              return [...prev, uniqueLanguages[i]]
+            })
+          }, i * 400)
+        }
+        
+      } catch (error) {
+        console.error("Failed to fetch GitHub data:", error)
+      } finally {
+        setIsLoadingGitHub(false)
+      }
+    }
+
+    fetchGitHubData()
+  }, [session])
 
   const runStep1 = useCallback(() => {
     const interval = setInterval(() => {
@@ -99,16 +147,22 @@ export function OnboardingFlow() {
       return () => clearInterval(interval)
     }
     if (currentStep === 2) {
-      // Animate match count
+      // Animate match count to actual repo count
+      const targetCount = actualRepoCount || 12 // Fallback to 12 if not loaded yet
       let count = 0
+      const increment = Math.ceil(targetCount / 12) // Adjust speed based on count
       const interval = setInterval(() => {
-        count += 1
-        setMatchCount(count)
-        if (count >= 12) clearInterval(interval)
+        count += increment
+        if (count >= targetCount) {
+          setMatchCount(targetCount)
+          clearInterval(interval)
+        } else {
+          setMatchCount(count)
+        }
       }, 100)
       return () => clearInterval(interval)
     }
-  }, [currentStep, runStep1, runStep2])
+  }, [currentStep, runStep1, runStep2, actualRepoCount])
 
   const steps = [
     {
@@ -196,15 +250,17 @@ export function OnboardingFlow() {
               {/* Step 1: Languages */}
               {i === 0 && (isActive || isDone) && (
                 <div className="mt-4 flex flex-wrap gap-2 pl-14">
-                  {detectedLanguages.map((lang) => {
+                  {detectedLanguages.map((lang, index) => {
                     const langData = languages.find((l) => l.name === lang)
+                    // Use predefined color or default to primary color
+                    const colorClass = langData?.color || "bg-primary"
                     return (
                       <span
-                        key={lang}
+                        key={`${lang}-${index}`}
                         className="inline-flex animate-in fade-in items-center gap-1.5 rounded-md border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-foreground"
                       >
                         <span
-                          className={`h-2 w-2 rounded-full ${langData?.color}`}
+                          className={`h-2 w-2 rounded-full ${colorClass}`}
                         />
                         {lang}
                       </span>
@@ -228,7 +284,7 @@ export function OnboardingFlow() {
               )}
 
               {/* Step 3: CTA */}
-              {i === 2 && isActive && matchCount >= 12 && (
+              {i === 2 && isActive && matchCount > 0 && (
                 <div className="mt-4 pl-14">
                   <button
                     onClick={() => router.push("/dashboard")}

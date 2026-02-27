@@ -4,10 +4,14 @@ import { useState, useCallback } from "react"
 import { Upload, FileText, X, CheckCircle2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { useGitHub } from "@/hooks/use-github"
 
 export function SettingsResume() {
+  const { profile } = useGitHub()
+  const userLogin = profile?.user.login || "user"
+  
   const [file, setFile] = useState<{ name: string; size: string } | null>({
-    name: "jane_doe_resume_2025.pdf",
+    name: `${userLogin}_resume_2025.pdf`,
     size: "245 KB",
   })
   const [isDragging, setIsDragging] = useState(false)

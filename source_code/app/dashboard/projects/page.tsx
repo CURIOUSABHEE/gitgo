@@ -1,3 +1,5 @@
+"use client"
+
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -12,307 +14,229 @@ import {
   CheckCircle2,
   AlertCircle,
   Star,
+  Loader2,
+  GitFork,
 } from "lucide-react"
 import Link from "next/link"
-
-const trackedProjects = [
-  {
-    name: "next.js",
-    owner: "vercel",
-    slug: "vercel-nextjs",
-    language: "TypeScript",
-    languageColor: "#3178c6",
-    status: "in-progress" as const,
-    prTitle: "fix: resolve hydration mismatch in app router",
-    prNumber: 58234,
-    prStatus: "open" as const,
-    progress: 65,
-    lastActivity: "2 hours ago",
-    issuesCompleted: 1,
-    issuesTotal: 3,
-    stars: 128000,
-  },
-  {
-    name: "fastapi",
-    owner: "tiangolo",
-    slug: "tiangolo-fastapi",
-    language: "Python",
-    languageColor: "#3572A5",
-    status: "merged" as const,
-    prTitle: "docs: add tutorial for WebSocket authentication",
-    prNumber: 12045,
-    prStatus: "merged" as const,
-    progress: 100,
-    lastActivity: "3 days ago",
-    issuesCompleted: 2,
-    issuesTotal: 2,
-    stars: 79000,
-  },
-  {
-    name: "excalidraw",
-    owner: "excalidraw",
-    slug: "excalidraw-excalidraw",
-    language: "TypeScript",
-    languageColor: "#3178c6",
-    status: "in-progress" as const,
-    prTitle: "feat: add keyboard shortcut for shape rotation",
-    prNumber: 8891,
-    prStatus: "review" as const,
-    progress: 85,
-    lastActivity: "5 hours ago",
-    issuesCompleted: 1,
-    issuesTotal: 1,
-    stars: 87000,
-  },
-  {
-    name: "supabase",
-    owner: "supabase",
-    slug: "supabase-supabase",
-    language: "TypeScript",
-    languageColor: "#3178c6",
-    status: "saved" as const,
-    prTitle: "",
-    prNumber: 0,
-    prStatus: "open" as const,
-    progress: 0,
-    lastActivity: "1 week ago",
-    issuesCompleted: 0,
-    issuesTotal: 2,
-    stars: 74000,
-  },
-]
-
-function StatusBadge({ status }: { status: string }) {
-  if (status === "merged") {
-    return (
-      <Badge className="border-0 bg-primary/15 text-primary">
-        <CheckCircle2 className="mr-1 h-3 w-3" />
-        Merged
-      </Badge>
-    )
-  }
-  if (status === "in-progress") {
-    return (
-      <Badge className="border-0 bg-amber-500/15 text-amber-400">
-        <Clock className="mr-1 h-3 w-3" />
-        In Progress
-      </Badge>
-    )
-  }
-  return (
-    <Badge variant="outline" className="border-border text-muted-foreground">
-      <Star className="mr-1 h-3 w-3" />
-      Saved
-    </Badge>
-  )
-}
-
-function PRStatusIndicator({ status }: { status: string }) {
-  if (status === "merged") {
-    return (
-      <span className="flex items-center gap-1.5 text-xs text-primary">
-        <GitPullRequest className="h-3.5 w-3.5" />
-        Merged
-      </span>
-    )
-  }
-  if (status === "review") {
-    return (
-      <span className="flex items-center gap-1.5 text-xs text-amber-400">
-        <AlertCircle className="h-3.5 w-3.5" />
-        In Review
-      </span>
-    )
-  }
-  return (
-    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-      <GitPullRequest className="h-3.5 w-3.5" />
-      Open
-    </span>
-  )
-}
+import { useGitHub } from "@/hooks/use-github"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 export default function ProjectsPage() {
-  const inProgress = trackedProjects.filter((p) => p.status === "in-progress")
-  const merged = trackedProjects.filter((p) => p.status === "merged")
-  const saved = trackedProjects.filter((p) => p.status === "saved")
+  const { profile, loading } = useGitHub()
+
+  if (loading) {
+    return (
+      <div className="flex flex-col">
+        <DashboardHeader title="My Projects" />
+        <div className="flex flex-1 items-center justify-center p-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex flex-col">
+        <DashboardHeader title="My Projects" />
+        <div className="flex flex-1 items-center justify-center p-12">
+          <p className="text-muted-foreground">No GitHub data available</p>
+        </div>
+      </div>
+    )
+  }
+
+  const userRepos = profile.repos.slice(0, 10) // Show top 10 repos
+  const totalStars = profile.stats.totalStars
+  const totalForks = profile.stats.totalForks
 
   return (
     <div className="flex flex-col">
       <DashboardHeader title="My Projects" />
 
       <div className="flex-1 p-6">
-        {/* Overview stats */}
-        <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-            <FolderGit2 className="h-5 w-5 text-primary" />
-          </div>
-          <div>
+        {/* User info section */}
+        <div className="mb-8 flex items-center gap-4 rounded-xl border border-border bg-card p-5">
+          <Avatar className="h-16 w-16">
+            <AvatarImage src={profile.user.avatar_url} alt={profile.user.name} />
+            <AvatarFallback>
+              {profile.user.name?.slice(0, 2).toUpperCase() || "U"}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
             <h2 className="text-lg font-semibold text-foreground">
-              My Projects
+              {profile.user.name || profile.user.login}
             </h2>
             <p className="text-sm text-muted-foreground">
-              Track your contributions, pull requests, and saved repos
+              @{profile.user.login}
+              {profile.user.bio && ` • ${profile.user.bio}`}
             </p>
+            {profile.user.location && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                📍 {profile.user.location}
+              </p>
+            )}
+          </div>
+          <div className="flex gap-4 text-sm">
+            <div className="text-center">
+              <p className="font-semibold text-foreground">{profile.user.followers}</p>
+              <p className="text-xs text-muted-foreground">Followers</p>
+            </div>
+            <div className="text-center">
+              <p className="font-semibold text-foreground">{profile.user.following}</p>
+              <p className="text-xs text-muted-foreground">Following</p>
+            </div>
           </div>
         </div>
 
+        {/* Overview stats */}
         <div className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
           <Card className="border-border bg-card">
             <CardContent className="p-4">
               <p className="text-2xl font-bold text-foreground">
-                {trackedProjects.length}
+                {profile.stats.totalRepos}
               </p>
-              <p className="text-xs text-muted-foreground">Total Projects</p>
+              <p className="text-xs text-muted-foreground">Total Repositories</p>
             </CardContent>
           </Card>
           <Card className="border-border bg-card">
             <CardContent className="p-4">
               <p className="text-2xl font-bold text-primary">
-                {merged.length}
+                {totalStars}
               </p>
-              <p className="text-xs text-muted-foreground">PRs Merged</p>
+              <p className="text-xs text-muted-foreground">Total Stars</p>
             </CardContent>
           </Card>
           <Card className="border-border bg-card">
             <CardContent className="p-4">
               <p className="text-2xl font-bold text-amber-400">
-                {inProgress.length}
+                {totalForks}
               </p>
-              <p className="text-xs text-muted-foreground">In Progress</p>
+              <p className="text-xs text-muted-foreground">Total Forks</p>
             </CardContent>
           </Card>
           <Card className="border-border bg-card">
             <CardContent className="p-4">
               <p className="text-2xl font-bold text-foreground">
-                {trackedProjects.reduce(
-                  (sum, p) => sum + p.issuesCompleted,
-                  0
-                )}
+                {profile.languages.length}
               </p>
-              <p className="text-xs text-muted-foreground">Issues Completed</p>
+              <p className="text-xs text-muted-foreground">Languages</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Project sections */}
-        {inProgress.length > 0 && (
-          <section className="mb-8">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Clock className="h-4 w-4 text-amber-400" />
-              In Progress ({inProgress.length})
-            </h3>
-            <div className="grid gap-4">
-              {inProgress.map((project) => (
-                <ProjectCard key={project.slug} project={project} />
-              ))}
-            </div>
-          </section>
-        )}
+        {/* Languages */}
+        <div className="mb-8">
+          <h3 className="mb-3 text-sm font-medium text-muted-foreground">
+            Languages
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {profile.languages.map((lang) => (
+              <Badge
+                key={lang}
+                variant="outline"
+                className="border-primary/20 bg-primary/10 text-primary"
+              >
+                {lang}
+              </Badge>
+            ))}
+          </div>
+        </div>
 
-        {merged.length > 0 && (
-          <section className="mb-8">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 text-primary" />
-              Merged ({merged.length})
-            </h3>
-            <div className="grid gap-4">
-              {merged.map((project) => (
-                <ProjectCard key={project.slug} project={project} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {saved.length > 0 && (
-          <section>
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-muted-foreground">
-              <Star className="h-4 w-4" />
-              Saved ({saved.length})
-            </h3>
-            <div className="grid gap-4">
-              {saved.map((project) => (
-                <ProjectCard key={project.slug} project={project} />
-              ))}
-            </div>
-          </section>
-        )}
+        {/* Repositories */}
+        <section>
+          <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <FolderGit2 className="h-4 w-4" />
+            Recent Repositories ({userRepos.length})
+          </h3>
+          <div className="grid gap-4">
+            {userRepos.map((repo) => (
+              <RepoCard key={repo.id} repo={repo} />
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   )
 }
 
-function ProjectCard({
-  project,
-}: {
-  project: (typeof trackedProjects)[number]
-}) {
+function RepoCard({ repo }: { repo: any }) {
+  const languageColors: Record<string, string> = {
+    TypeScript: "#3178c6",
+    JavaScript: "#f1e05a",
+    Python: "#3572A5",
+    Java: "#b07219",
+    Go: "#00ADD8",
+    Rust: "#dea584",
+    Ruby: "#701516",
+    PHP: "#4F5D95",
+    C: "#555555",
+    "C++": "#f34b7d",
+    "C#": "#178600",
+    Swift: "#ffac45",
+    Kotlin: "#A97BFF",
+    Dart: "#00B4AB",
+  }
+
+  const languageColor = repo.language ? languageColors[repo.language] || "#8b949e" : "#8b949e"
+  const updatedDate = new Date(repo.updated_at).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })
+
   return (
     <Card className="border-border bg-card transition-colors hover:border-primary/30">
       <CardHeader className="flex flex-row items-start justify-between gap-4 p-5 pb-3">
         <div className="flex-1">
           <div className="mb-2 flex items-center gap-3">
-            <Link
-              href={`/dashboard/project/${project.slug}`}
+            <a
+              href={repo.html_url}
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-base font-semibold text-foreground hover:text-primary transition-colors"
             >
-              {project.owner}/{project.name}
-            </Link>
-            <StatusBadge status={project.status} />
+              {repo.full_name}
+            </a>
+            {repo.topics && repo.topics.length > 0 && (
+              <Badge variant="outline" className="text-xs">
+                {repo.topics[0]}
+              </Badge>
+            )}
           </div>
-          {project.prTitle && (
-            <div className="flex items-center gap-2">
-              <PRStatusIndicator status={project.prStatus} />
-              <span className="text-sm text-muted-foreground">
-                {project.prTitle}
-              </span>
-              {project.prNumber > 0 && (
-                <span className="font-mono text-xs text-muted-foreground">
-                  #{project.prNumber}
-                </span>
-              )}
-            </div>
+          {repo.description && (
+            <p className="text-sm text-muted-foreground line-clamp-2">
+              {repo.description}
+            </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            className="h-3 w-3 rounded-full"
-            style={{ backgroundColor: project.languageColor }}
-          />
-          <span className="text-xs text-muted-foreground">
-            {project.language}
-          </span>
-        </div>
+        {repo.language && (
+          <div className="flex items-center gap-2">
+            <span
+              className="h-3 w-3 rounded-full"
+              style={{ backgroundColor: languageColor }}
+            />
+            <span className="text-xs text-muted-foreground">
+              {repo.language}
+            </span>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="p-5 pt-0">
         <div className="flex items-center justify-between gap-6">
-          <div className="flex-1">
-            {project.status !== "saved" && (
-              <div className="mb-2">
-                <div className="mb-1 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">
-                    Progress
-                  </span>
-                  <span className="text-xs font-medium text-foreground">
-                    {project.progress}%
-                  </span>
-                </div>
-                <Progress
-                  value={project.progress}
-                  className="h-1.5 bg-secondary [&>div]:bg-primary"
-                />
-              </div>
-            )}
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <GitCommit className="h-3 w-3" />
-                {project.issuesCompleted}/{project.issuesTotal} issues
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-3 w-3" />
-                {project.lastActivity}
-              </span>
-            </div>
+          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Star className="h-3 w-3" />
+              {repo.stargazers_count}
+            </span>
+            <span className="flex items-center gap-1">
+              <GitFork className="h-3 w-3" />
+              {repo.forks_count}
+            </span>
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              Updated {updatedDate}
+            </span>
           </div>
           <Button
             asChild
@@ -320,10 +244,10 @@ function ProjectCard({
             size="sm"
             className="text-muted-foreground hover:text-foreground"
           >
-            <Link href={`/dashboard/project/${project.slug}`}>
+            <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="mr-1 h-3.5 w-3.5" />
               View
-            </Link>
+            </a>
           </Button>
         </div>
       </CardContent>

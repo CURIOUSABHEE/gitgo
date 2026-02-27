@@ -1,10 +1,23 @@
 "use client"
 
 import Link from "next/link"
-import { Github, Upload, ArrowRight, GitBranch, Star, GitPullRequest } from "lucide-react"
+import { useSession, signIn } from "next-auth/react"
+import { Github, LayoutDashboard, ArrowRight, GitBranch, Star, GitPullRequest } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export function Hero() {
+  const { data: session } = useSession()
+
+  const handleGetStarted = () => {
+    if (session) {
+      // Already logged in, go to dashboard
+      window.location.href = "/dashboard"
+    } else {
+      // Not logged in, sign in with GitHub
+      signIn("github", { callbackUrl: "/onboarding" })
+    }
+  }
+
   return (
     <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pt-16">
       {/* Background grid effect */}
@@ -35,24 +48,21 @@ export function Hero() {
           <Button
             size="lg"
             className="h-12 bg-primary px-8 text-base font-medium text-primary-foreground hover:bg-primary/90 glow-green"
-            asChild
+            onClick={handleGetStarted}
           >
-            <Link href="/onboarding">
-              <Github className="mr-2 h-5 w-5" />
-              Get Started via GitHub
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            className="h-12 border-border px-8 text-base font-medium text-foreground hover:bg-secondary"
-            asChild
-          >
-            <Link href="/onboarding">
-              <Upload className="mr-2 h-5 w-5" />
-              Upload Resume
-            </Link>
+            {session ? (
+              <>
+                <LayoutDashboard className="mr-2 h-5 w-5" />
+                Go to Dashboard
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </>
+            ) : (
+              <>
+                <Github className="mr-2 h-5 w-5" />
+                Get Started via GitHub
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </>
+            )}
           </Button>
         </div>
 

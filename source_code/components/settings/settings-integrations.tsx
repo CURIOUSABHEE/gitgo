@@ -1,8 +1,12 @@
 "use client"
 
-import { RefreshCw } from "lucide-react"
+import { useEffect, useState } from "react"
+import { useSession } from "next-auth/react"
+import { signIn } from "next-auth/react"
+import { RefreshCw, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { useGitHub } from "@/hooks/use-github"
 
 interface Integration {
   name: string
@@ -10,6 +14,7 @@ interface Integration {
   connected: boolean
   icon: React.ReactNode
   username?: string
+  lastSynced?: string
 }
 
 function GitHubIcon() {
@@ -28,23 +33,59 @@ function LinkedInIcon() {
   )
 }
 
-const integrations: Integration[] = [
-  {
-    name: "GitHub",
-    description: "Used to analyze your repositories and find matching open source projects.",
-    connected: true,
-    icon: <GitHubIcon />,
-    username: "janedoe",
-  },
-  {
-    name: "LinkedIn",
-    description: "Import your experience and skills to improve match accuracy.",
-    connected: false,
-    icon: <LinkedInIcon />,
-  },
-]
-
 export function SettingsIntegrations() {
+  const { data: session } = useSession()
+  const { profile, loading, refreshProfile } = useGitHub()
+  const [syncing, setSyncing] = useState(false)
+  const [lastSyncTime, setLastSyncTime] = useState<string>("Never")
+
+  useEffect(() => {
+    if (profile) {
+      setLastSyncTime(new Date().toLocaleString())
+    }
+  }, [profile])
+
+  const handleResync = async () => {
+    setSyncing(true)
+    try {
+      await refreshProfile()
+      setLastSyncTime(new Date().toLocaleString())
+    } catch (error) {
+      console.error("Failed to resync:", error)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const handleGitHubConnect = () => {
+    signIn("github", { callbackUrl: "/dashboard/settings" })
+  }
+
+  const integrations: Integration[] = [
+    {
+      name: "GitHub",
+      description: "Used to analyze your repositories and find matching open source projects.",
+      connected: !!session?.accessToken,
+      icon: <GitHubIcon />,
+      username: profile?.user.login,
+      lastSynced: lastSyncTime,
+    },
+    {
+      name: "LinkedIn",
+      description: "Import your experience and skills to improve match accuracy.",
+      connected: false,
+      icon: <LinkedInIcon />,
+    },
+  ]
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-2xl">
       <div>
@@ -102,12 +143,18 @@ export function SettingsIntegrations() {
                   variant="secondary"
                   size="sm"
                   className="h-8 gap-1.5 text-xs"
+                  onClick={handleResync}
+                  disabled={syncing}
                 >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Re-sync Data
+                  <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+                  {syncing ? "Syncing..." : "Re-sync Data"}
                 </Button>
               ) : (
-                <Button size="sm" className="h-8 text-xs">
+                <Button 
+                  size="sm" 
+                  className="h-8 text-xs"
+                  onClick={integration.name === "GitHub" ? handleGitHubConnect : undefined}
+                >
                   Connect
                 </Button>
               )}
@@ -120,8 +167,10 @@ export function SettingsIntegrations() {
 
       <div className="rounded-lg border border-border bg-secondary/30 px-4 py-3">
         <p className="text-xs text-muted-foreground">
-          Last synced: 2 hours ago. gitgo only reads public repository data and does not
-          modify any of your accounts.
+          {session?.accessToken 
+            ? `Last synced: ${lastSyncTime}. gitgo only reads public repository data and does not modify any of your accounts.`
+            : "Connect your GitHub account to start syncing your data."
+          }
         </p>
       </div>
     </div>

@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { signOut } from "next-auth/react"
 import {
   Terminal,
   LayoutDashboard,
@@ -27,7 +28,8 @@ import {
   SidebarMenuItem,
   SidebarSeparator,
 } from "@/components/ui/sidebar"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { useGitHub } from "@/hooks/use-github"
 
 const mainNav = [
   {
@@ -60,18 +62,35 @@ const mainNav = [
 const filters = [
   {
     title: "My Tech Stack",
-    href: "/dashboard",
+    href: "/dashboard?filter=techstack",
     icon: Layers,
   },
   {
     title: "Trending",
-    href: "/dashboard",
+    href: "/dashboard?filter=trending",
     icon: TrendingUp,
   },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const { profile } = useGitHub()
+
+  const userName = profile?.user.name || "User"
+  const userLogin = profile?.user.login || "user"
+  const userAvatar = profile?.user.avatar_url
+  
+  // Generate initials from name or username
+  const initials = profile?.user.name
+    ? profile.user.name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+    : userLogin.slice(0, 2).toUpperCase()
+
+  // Get languages from profile (same as My Projects page)
+  const languages = profile?.languages || []
+
+  const handleLogout = () => {
+    signOut({ callbackUrl: "/" })
+  }
 
   return (
     <Sidebar className="border-r border-sidebar-border">
@@ -135,15 +154,17 @@ export function AppSidebar() {
           <SidebarGroupLabel>Skills Detected</SidebarGroupLabel>
           <SidebarGroupContent>
             <div className="flex flex-wrap gap-1.5 px-2">
-              {["React", "TypeScript", "Python", "Node.js", "PostgreSQL"].map(
-                (skill) => (
+              {languages.length > 0 ? (
+                languages.map((lang) => (
                   <span
-                    key={skill}
+                    key={lang}
                     className="rounded-md border border-primary/20 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary"
                   >
-                    {skill}
+                    {lang}
                   </span>
-                )
+                ))
+              ) : (
+                <span className="text-xs text-muted-foreground">No skills detected yet</span>
               )}
             </div>
           </SidebarGroupContent>
@@ -166,19 +187,23 @@ export function AppSidebar() {
         <SidebarSeparator />
         <div className="flex items-center gap-3 rounded-lg px-2 py-2">
           <Avatar className="h-8 w-8">
+            {userAvatar && <AvatarImage src={userAvatar} alt={userName} />}
             <AvatarFallback className="bg-secondary text-xs text-foreground">
-              JD
+              {initials}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 truncate">
             <p className="truncate text-sm font-medium text-foreground">
-              Jane Doe
+              {userName}
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              @janedoe
+              @{userLogin}
             </p>
           </div>
-          <button className="text-muted-foreground transition-colors hover:text-foreground">
+          <button 
+            onClick={handleLogout}
+            className="text-muted-foreground transition-colors hover:text-foreground"
+          >
             <LogOut className="h-4 w-4" />
             <span className="sr-only">Log out</span>
           </button>

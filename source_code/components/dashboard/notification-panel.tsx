@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { useGitHub } from "@/hooks/use-github"
 
 type NotificationType = "repo-alert" | "social" | "mention" | "pr-update"
 
@@ -172,7 +173,17 @@ function NotificationItem({
 }
 
 export function NotificationPanel() {
-  const [notifications, setNotifications] = useState(initialNotifications)
+  const { profile } = useGitHub()
+  const userLogin = profile?.user.login || "user"
+  
+  // Update the mention notification with actual username
+  const initialNotificationsWithUser = initialNotifications.map(notif => 
+    notif.id === "4" 
+      ? { ...notif, description: `"@${userLogin} you should check out the FastAPI docs refactor!"` }
+      : notif
+  )
+  
+  const [notifications, setNotifications] = useState(initialNotificationsWithUser)
 
   const unreadCount = notifications.filter((n) => !n.read).length
 

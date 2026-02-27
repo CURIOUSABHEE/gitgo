@@ -1,3 +1,7 @@
+"use client"
+
+import { useSearchParams } from "next/navigation"
+import { useEffect, useState, Suspense } from "react"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { RepoCard } from "@/components/dashboard/repo-card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -90,7 +94,53 @@ const repos = [
   },
 ]
 
-export default function DashboardPage() {
+function DashboardContent() {
+  const searchParams = useSearchParams()
+  const filter = searchParams?.get("filter")
+  const [userSkills, setUserSkills] = useState<string[]>([])
+  const [filteredRepos, setFilteredRepos] = useState(repos)
+
+  // Fetch user skills for filtering
+  useEffect(() => {
+    const fetchSkills = async () => {
+      try {
+        const response = await fetch("/api/github/skills")
+        if (response.ok) {
+          const data = await response.json()
+          const allSkills = [...(data.languages || []), ...(data.skills || [])]
+          setUserSkills(allSkills)
+        }
+      } catch (error) {
+        console.error("Failed to fetch skills:", error)
+      }
+    }
+
+    fetchSkills()
+  }, [])
+
+  // Apply filter based on query parameter
+  useEffect(() => {
+    if (filter === "techstack" && userSkills.length > 0) {
+      // Filter repos that match user's tech stack
+      const filtered = repos.filter((repo) => {
+        const repoTechs = [repo.language, ...repo.tags]
+        return repoTechs.some((tech) =>
+          userSkills.some((skill) =>
+            tech.toLowerCase().includes(skill.toLowerCase()) ||
+            skill.toLowerCase().includes(tech.toLowerCase())
+          )
+        )
+      })
+      setFilteredRepos(filtered)
+    } else if (filter === "trending") {
+      // Sort by stars for trending
+      const sorted = [...repos].sort((a, b) => b.stars - a.stars)
+      setFilteredRepos(sorted)
+    } else {
+      setFilteredRepos(repos)
+    }
+  }, [filter, userSkills])
+
   return (
     <div className="flex flex-col">
       <DashboardHeader title="Dashboard" />
@@ -104,10 +154,18 @@ export default function DashboardPage() {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-foreground">
-                Recommended for You
+                {filter === "techstack"
+                  ? "Matches Your Tech Stack"
+                  : filter === "trending"
+                  ? "Trending Projects"
+                  : "Recommended for You"}
               </h2>
               <p className="text-sm text-muted-foreground">
-                Personalized matches based on your Resume and GitHub profile
+                {filter === "techstack"
+                  ? `Showing ${filteredRepos.length} projects matching your skills`
+                  : filter === "trending"
+                  ? "Most popular open source projects"
+                  : "Personalized matches based on your Resume and GitHub profile"}
               </p>
             </div>
           </div>
@@ -123,7 +181,7 @@ export default function DashboardPage() {
 
           <TabsContent value="all">
             <div className="grid gap-4 lg:grid-cols-2">
-              {repos.map((repo) => (
+              {filteredRepos.map((repo) => (
                 <RepoCard key={`${repo.owner}/${repo.name}`} {...repo} />
               ))}
             </div>
@@ -131,7 +189,7 @@ export default function DashboardPage() {
 
           <TabsContent value="high">
             <div className="grid gap-4 lg:grid-cols-2">
-              {repos
+              {filteredRepos
                 .filter((r) => r.matchScore >= 90)
                 .map((repo) => (
                   <RepoCard key={`${repo.owner}/${repo.name}`} {...repo} />
@@ -141,7 +199,7 @@ export default function DashboardPage() {
 
           <TabsContent value="beginner">
             <div className="grid gap-4 lg:grid-cols-2">
-              {repos
+              {filteredRepos
                 .filter((r) => r.tags.includes("beginner-friendly"))
                 .map((repo) => (
                   <RepoCard key={`${repo.owner}/${repo.name}`} {...repo} />
@@ -151,5 +209,22 @@ export default function DashboardPage() {
         </Tabs>
       </div>
     </div>
+  )
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col">
+        <DashboardHeader title="Dashboard" />
+        <div className="flex-1 p-6">
+          <div className="flex items-center justify-center py-12">
+            <div className="text-muted-foreground">Loading...</div>
+          </div>
+        </div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   )
 }
