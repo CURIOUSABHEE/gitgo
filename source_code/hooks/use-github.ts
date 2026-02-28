@@ -8,6 +8,7 @@ interface GitHubProfile {
     email: string
     avatar_url: string
     bio: string
+    title: string
     public_repos: number
     followers: number
     following: number
@@ -79,6 +80,27 @@ export function useGitHub() {
     setError(null)
 
     try {
+      // Fetch from database (not GitHub) to get the updated profile
+      const response = await fetch("/api/github/profile")
+      if (!response.ok) {
+        throw new Error("Failed to refresh profile")
+      }
+      const data = await response.json()
+      setProfile(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const syncFromGitHub = async () => {
+    if (!session?.accessToken) return
+
+    setLoading(true)
+    setError(null)
+
+    try {
       const response = await fetch("/api/github/sync", {
         method: "POST",
       })
@@ -94,5 +116,5 @@ export function useGitHub() {
     }
   }
 
-  return { profile, loading, error, isAuthenticated: !!session, refreshProfile }
+  return { profile, loading, error, isAuthenticated: !!session, refreshProfile, syncFromGitHub }
 }

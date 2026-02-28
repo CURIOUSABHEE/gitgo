@@ -1,4 +1,5 @@
-import Link from "next/link"
+"use client"
+
 import { Star, GitFork, ExternalLink } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
@@ -13,6 +14,7 @@ interface RepoCardProps {
   language: string
   languageColor: string
   tags: string[]
+  onCardClick?: (owner: string, repo: string) => void
 }
 
 export function RepoCard({
@@ -26,6 +28,7 @@ export function RepoCard({
   language,
   languageColor,
   tags,
+  onCardClick,
 }: RepoCardProps) {
   const scoreColor =
     matchScore >= 90
@@ -34,8 +37,17 @@ export function RepoCard({
         ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30"
         : "bg-muted text-muted-foreground border-border"
 
+  const handleClick = () => {
+    if (onCardClick) {
+      onCardClick(owner, name)
+    }
+  }
+
   return (
-    <Link href="/dashboard/project/example-repo" className="group block">
+    <div 
+      onClick={handleClick}
+      className="group block cursor-pointer"
+    >
       <div className="rounded-xl border border-border bg-card p-5 transition-all hover:border-primary/30 hover:bg-secondary/30">
         {/* Header */}
         <div className="flex items-start justify-between gap-4">
@@ -102,6 +114,6 @@ export function RepoCard({
           </span>
         </div>
       </div>
-    </Link>
+    </div>
   )
 }

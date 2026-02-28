@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useGitHub } from "@/hooks/use-github"
+import toast from "react-hot-toast"
 
 function GitHubIcon() {
   return (
@@ -41,7 +42,10 @@ export function SettingsIntegrations() {
   const { data: session } = useSession()
   const { profile, loading, refreshProfile } = useGitHub()
   const [syncing, setSyncing] = useState(false)
+  const [linkedinSyncing, setLinkedinSyncing] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState<string>("Never")
+  const [linkedinConnected, setLinkedinConnected] = useState(false)
+  const [linkedinLastSync, setLinkedinLastSync] = useState<string>("Never")
 
   // LinkedIn state
   const [linkedinData, setLinkedinData] = useState<LinkedInData | null>(null)
@@ -85,13 +89,38 @@ export function SettingsIntegrations() {
     }
   }, [profile])
 
+  // Check if LinkedIn is connected
+  useEffect(() => {
+    const checkLinkedInConnection = async () => {
+      try {
+        const response = await fetch("/api/linkedin/status")
+        if (response.ok) {
+          const data = await response.json()
+          setLinkedinConnected(data.connected)
+          if (data.lastSynced) {
+            setLinkedinLastSync(new Date(data.lastSynced).toLocaleString())
+          }
+        }
+      } catch (error) {
+        console.error("Failed to check LinkedIn status:", error)
+      }
+    }
+
+    if (session) {
+      checkLinkedInConnection()
+    }
+  }, [session])
+
   const handleResync = async () => {
     setSyncing(true)
+    const toastId = toast.loading("Syncing GitHub data...")
     try {
       await refreshProfile()
       setLastSyncTime(new Date().toLocaleString())
+      toast.success("GitHub data synced successfully!", { id: toastId })
     } catch (error) {
       console.error("Failed to resync:", error)
+      toast.error("Failed to sync GitHub data", { id: toastId })
     } finally {
       setSyncing(false)
     }
@@ -99,6 +128,37 @@ export function SettingsIntegrations() {
 
   const handleGitHubConnect = () => {
     signIn("github", { callbackUrl: "/dashboard/settings" })
+  }
+
+  const handleLinkedInConnect = () => {
+    signIn("linkedin", { callbackUrl: "/dashboard/settings" })
+  }
+
+  const handleLinkedInSync = async () => {
+    setLinkedinSyncing(true)
+    const toastId = toast.loading("Syncing LinkedIn data...")
+    try {
+      const response = await fetch("/api/linkedin/sync", {
+        method: "POST",
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Failed to sync LinkedIn data")
+      }
+
+      const data = await response.json()
+      setLinkedinLastSync(new Date().toLocaleString())
+      toast.success("LinkedIn data synced successfully!", { id: toastId })
+    } catch (error) {
+      console.error("Failed to sync LinkedIn:", error)
+      toast.error(
+        error instanceof Error ? error.message : "Failed to sync LinkedIn data",
+        { id: toastId }
+      )
+    } finally {
+      setLinkedinSyncing(false)
+    }
   }
 
   const handleLinkedinSave = async () => {

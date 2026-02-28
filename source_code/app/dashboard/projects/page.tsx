@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -16,13 +17,23 @@ import {
   Star,
   Loader2,
   GitFork,
+  FileText,
 } from "lucide-react"
 import Link from "next/link"
 import { useGitHub } from "@/hooks/use-github"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { RepoDetailsModal } from "@/components/dashboard/repo-details-modal"
 
 export default function ProjectsPage() {
   const { profile, loading } = useGitHub()
+  const [selectedRepo, setSelectedRepo] = useState<{ owner: string; repo: string } | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+
+  const handleReadMore = (fullName: string) => {
+    const [owner, repo] = fullName.split("/")
+    setSelectedRepo({ owner, repo })
+    setModalOpen(true)
+  }
 
   if (loading) {
     return (
@@ -151,16 +162,26 @@ export default function ProjectsPage() {
           </h3>
           <div className="grid gap-4">
             {userRepos.map((repo) => (
-              <RepoCard key={repo.id} repo={repo} />
+              <RepoCard key={repo.id} repo={repo} onReadMore={handleReadMore} />
             ))}
           </div>
         </section>
+
+        {/* Repository Details Modal */}
+        {selectedRepo && (
+          <RepoDetailsModal
+            open={modalOpen}
+            onOpenChange={setModalOpen}
+            owner={selectedRepo.owner}
+            repo={selectedRepo.repo}
+          />
+        )}
       </div>
     </div>
   )
 }
 
-function RepoCard({ repo }: { repo: any }) {
+function RepoCard({ repo, onReadMore }: { repo: any; onReadMore: (fullName: string) => void }) {
   const languageColors: Record<string, string> = {
     TypeScript: "#3178c6",
     JavaScript: "#f1e05a",
@@ -238,17 +259,27 @@ function RepoCard({ repo }: { repo: any }) {
               Updated {updatedDate}
             </span>
           </div>
-          <Button
-            asChild
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
-              <ExternalLink className="mr-1 h-3.5 w-3.5" />
-              View
-            </a>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onReadMore(repo.full_name)}
+            >
+              <FileText className="mr-1 h-3.5 w-3.5" />
+              Read More
+            </Button>
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="mr-1 h-3.5 w-3.5" />
+                View
+              </a>
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

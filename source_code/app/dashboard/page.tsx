@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation"
 import { useEffect, useState, Suspense } from "react"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { RepoCard } from "@/components/dashboard/repo-card"
+import { RepoDetailsModal } from "@/components/dashboard/repo-details-modal"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Sparkles } from "lucide-react"
 
@@ -99,6 +100,13 @@ function DashboardContent() {
   const filter = searchParams?.get("filter")
   const [userSkills, setUserSkills] = useState<string[]>([])
   const [filteredRepos, setFilteredRepos] = useState(repos)
+  const [selectedRepo, setSelectedRepo] = useState<{ owner: string; repo: string } | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+
+  const handleRepoClick = (owner: string, repo: string) => {
+    setSelectedRepo({ owner, repo })
+    setModalOpen(true)
+  }
 
   // Fetch user skills for filtering
   useEffect(() => {
@@ -182,7 +190,11 @@ function DashboardContent() {
           <TabsContent value="all">
             <div className="grid gap-4 lg:grid-cols-2">
               {filteredRepos.map((repo) => (
-                <RepoCard key={`${repo.owner}/${repo.name}`} {...repo} />
+                <RepoCard 
+                  key={`${repo.owner}/${repo.name}`} 
+                  {...repo} 
+                  onCardClick={handleRepoClick}
+                />
               ))}
             </div>
           </TabsContent>
@@ -192,7 +204,11 @@ function DashboardContent() {
               {filteredRepos
                 .filter((r) => r.matchScore >= 90)
                 .map((repo) => (
-                  <RepoCard key={`${repo.owner}/${repo.name}`} {...repo} />
+                  <RepoCard 
+                    key={`${repo.owner}/${repo.name}`} 
+                    {...repo} 
+                    onCardClick={handleRepoClick}
+                  />
                 ))}
             </div>
           </TabsContent>
@@ -202,11 +218,25 @@ function DashboardContent() {
               {filteredRepos
                 .filter((r) => r.tags.includes("beginner-friendly"))
                 .map((repo) => (
-                  <RepoCard key={`${repo.owner}/${repo.name}`} {...repo} />
+                  <RepoCard 
+                    key={`${repo.owner}/${repo.name}`} 
+                    {...repo} 
+                    onCardClick={handleRepoClick}
+                  />
                 ))}
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Repository Details Modal */}
+        {selectedRepo && (
+          <RepoDetailsModal
+            open={modalOpen}
+            onOpenChange={setModalOpen}
+            owner={selectedRepo.owner}
+            repo={selectedRepo.repo}
+          />
+        )}
       </div>
     </div>
   )

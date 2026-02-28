@@ -1,5 +1,9 @@
+"use client"
+
+import { useState } from "react"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { RepoCard } from "@/components/dashboard/repo-card"
+import { RepoDetailsModal } from "@/components/dashboard/repo-details-modal"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Compass, Search } from "lucide-react"
@@ -130,6 +134,14 @@ const exploreRepos = [
 ]
 
 export default function ExplorePage() {
+  const [selectedRepo, setSelectedRepo] = useState<{ owner: string; repo: string } | null>(null)
+  const [modalOpen, setModalOpen] = useState(false)
+
+  const handleRepoClick = (owner: string, repo: string) => {
+    setSelectedRepo({ owner, repo })
+    setModalOpen(true)
+  }
+
   return (
     <div className="flex flex-col">
       <DashboardHeader title="Explore" />
@@ -179,9 +191,23 @@ export default function ExplorePage() {
         {/* Repo grid */}
         <div className="grid gap-4 lg:grid-cols-2">
           {exploreRepos.map((repo) => (
-            <RepoCard key={`${repo.owner}/${repo.name}`} {...repo} />
+            <RepoCard 
+              key={`${repo.owner}/${repo.name}`} 
+              {...repo} 
+              onCardClick={handleRepoClick}
+            />
           ))}
         </div>
+
+        {/* Repository Details Modal */}
+        {selectedRepo && (
+          <RepoDetailsModal
+            open={modalOpen}
+            onOpenChange={setModalOpen}
+            owner={selectedRepo.owner}
+            repo={selectedRepo.repo}
+          />
+        )}
       </div>
     </div>
   )

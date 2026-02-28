@@ -7,12 +7,14 @@ import { SettingsIntegrations } from "@/components/settings/settings-integration
 import { SettingsResume } from "@/components/settings/settings-resume"
 import { SettingsPreferences } from "@/components/settings/settings-preferences"
 import { SettingsTechnologyMap } from "@/components/settings/settings-technology-map"
-import { User, Plug, FileText, SlidersHorizontal, Code2 } from "lucide-react"
+import { SettingsSubscription } from "@/components/settings/settings-subscription"
+import { User, Plug, FileText, SlidersHorizontal, Code2, CreditCard } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const tabs = [
   { id: "profile", label: "Profile", icon: User },
   { id: "technology", label: "Technology Map", icon: Code2 },
+  { id: "subscription", label: "Subscription", icon: CreditCard },
   { id: "integrations", label: "Integrations", icon: Plug },
   { id: "resume", label: "Resume", icon: FileText },
   { id: "preferences", label: "Preferences", icon: SlidersHorizontal },
@@ -54,6 +56,7 @@ export default function SettingsPage() {
         <div className="min-w-0 flex-1">
           {activeTab === "profile" && <SettingsProfile />}
           {activeTab === "technology" && <SettingsTechnologyMap />}
+          {activeTab === "subscription" && <SettingsSubscription />}
           {activeTab === "integrations" && <SettingsIntegrations />}
           {activeTab === "resume" && <SettingsResume />}
           {activeTab === "preferences" && <SettingsPreferences />}

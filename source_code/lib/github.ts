@@ -81,3 +81,354 @@ export class GitHubAPI {
     return this.fetch(`/users/${username}/events/public?per_page=100`)
   }
 }
+
+// Additional types for repository analysis
+export interface TreeItem {
+  path: string
+  type: "blob" | "tree"
+  sha?: string
+  size?: number
+  url?: string
+}
+
+export interface KeyFile {
+  path: string
+  content: string
+}
+
+export interface TechStackCategory {
+  source: string
+  dependencies: string[]
+  devDependencies: string[]
+}
+
+export interface TechStack {
+  frontend?: TechStackCategory
+  backend?: TechStackCategory
+}
+
+// Fetch repository file tree
+export async function getFileTree(
+  owner: string,
+  repo: string,
+  token: string
+): Promise<TreeItem[]> {
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/git/trees/main?recursive=1`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github.v3+json",
+      },
+    }
+  )
+
+  if (!response.ok) {
+    // Try 'master' branch if 'main' fails
+    const masterResponse = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/git/trees/master?recursive=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+      }
+    )
+    
+    if (!masterResponse.ok) {
+      throw new Error("Failed to fetch file tree")
+    }
+    
+    const data = await masterResponse.json()
+    return data.tree || []
+  }
+
+  const data = await response.json()
+  return data.tree || []
+}
+
+// Fetch repository metadata
+export async function getRepoMetadata(
+  owner: string,
+  repo: string,
+  token: string
+): Promise<any> {
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github.v3+json",
+      },
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch repository metadata")
+  }
+
+  return response.json()
+}
+
+// Fetch recent commits
+export async function getRecentCommits(
+  owner: string,
+  repo: string,
+  token: string,
+  count: number = 10
+): Promise<any[]> {
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/commits?per_page=${count}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github.v3+json",
+      },
+    }
+  )
+
+  if (!response.ok) {
+    return []
+  }
+
+  return response.json()
+}
+
+// Fetch contributors
+export async function getContributors(
+  owner: string,
+  repo: string,
+  token: string
+): Promise<any[]> {
+  const response = await fetch(
+    `https://api.github.com/repos/${owner}/${repo}/contributors?per_page=20`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github.v3+json",
+      },
+    }
+  )
+
+  if (!response.ok) {
+    return []
+  }
+
+  return response.json()
+}
+
+// Fetch repository status (issues, PRs)
+export async function getRepoStatus(
+  owner: string,
+  repo: string,
+  token: string
+): Promise<any> {
+  const [openIssues, closedIssues, openPRs, closedPRs] = await Promise.all([
+    fetch(
+      `https://api.github.com/repos/${owner}/${repo}/issues?state=open&per_page=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+      }
+    ).then((r) => (r.ok ? r.json() : [])),
+    fetch(
+      `https://api.github.com/repos/${owner}/${repo}/issues?state=closed&per_page=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+      }
+    ).then((r) => (r.ok ? r.json() : [])),
+    fetch(
+      `https://api.github.com/repos/${owner}/${repo}/pulls?state=open&per_page=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+      }
+    ).then((r) => (r.ok ? r.json() : [])),
+    fetch(
+      `https://api.github.com/repos/${owner}/${repo}/pulls?state=closed&per_page=1`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+      }
+    ).then((r) => (r.ok ? r.json() : [])),
+  ])
+
+  return {
+    openIssues: openIssues.length,
+    closedIssues: closedIssues.length,
+    openPRs: openPRs.length,
+    closedPRs: closedPRs.length,
+    totalDeployments: 0,
+  }
+}
+
+// Detect tech stack from file tree
+export async function detectTechStack(
+  owner: string,
+  repo: string,
+  fileTree: TreeItem[],
+  token: string
+): Promise<TechStack> {
+  const techStack: TechStack = {}
+
+  // Check for package.json (frontend/backend)
+  const packageJson = fileTree.find((f) => f.path === "package.json")
+  if (packageJson) {
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/contents/package.json`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github.v3.raw",
+          },
+        }
+      )
+      if (response.ok) {
+        const content = await response.text()
+        const pkg = JSON.parse(content)
+        techStack.frontend = {
+          source: "package.json",
+          dependencies: Object.keys(pkg.dependencies || {}),
+          devDependencies: Object.keys(pkg.devDependencies || {}),
+        }
+      }
+    } catch (error) {
+      console.error("Failed to parse package.json:", error)
+    }
+  }
+
+  // Check for requirements.txt (Python backend)
+  const requirementsTxt = fileTree.find((f) => f.path === "requirements.txt")
+  if (requirementsTxt) {
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/contents/requirements.txt`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github.v3.raw",
+          },
+        }
+      )
+      if (response.ok) {
+        const content = await response.text()
+        const deps = content
+          .split("\n")
+          .filter((line) => line.trim() && !line.startsWith("#"))
+          .map((line) => line.split("==")[0].split(">=")[0].trim())
+        techStack.backend = {
+          source: "requirements.txt",
+          dependencies: deps,
+          devDependencies: [],
+        }
+      }
+    } catch (error) {
+      console.error("Failed to parse requirements.txt:", error)
+    }
+  }
+
+  return techStack
+}
+
+// Get key file contents for analysis
+export async function getKeyFileContents(
+  owner: string,
+  repo: string,
+  fileTree: TreeItem[],
+  token: string
+): Promise<KeyFile[]> {
+  const keyFilePatterns = [
+    /^README\.md$/i,
+    /^package\.json$/,
+    /^requirements\.txt$/,
+    /^app\.py$/,
+    /^main\.py$/,
+    /^server\.(js|ts)$/,
+    /^index\.(js|ts)$/,
+    /^app\/(.*)\/(page|route)\.(tsx?|jsx?)$/,
+    /routes?\.(js|ts)$/,
+  ]
+
+  const keyFiles = fileTree
+    .filter((f) => f.type === "blob" && keyFilePatterns.some((p) => p.test(f.path)))
+    .slice(0, 15) // Limit to 15 files
+
+  const contents: KeyFile[] = []
+
+  for (const file of keyFiles) {
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/contents/${file.path}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github.v3.raw",
+          },
+        }
+      )
+      if (response.ok) {
+        const content = await response.text()
+        // Limit content size
+        contents.push({
+          path: file.path,
+          content: content.slice(0, 10000), // Max 10KB per file
+        })
+      }
+    } catch (error) {
+      console.error(`Failed to fetch ${file.path}:`, error)
+    }
+  }
+
+  return contents
+}
+
+// Get specific files for route analysis
+export async function getSpecificFiles(
+  owner: string,
+  repo: string,
+  filePaths: string[],
+  token: string
+): Promise<string> {
+  let codebaseStr = ""
+
+  for (const filePath of filePaths) {
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/vnd.github.v3.raw",
+          },
+        }
+      )
+      if (response.ok) {
+        const content = await response.text()
+        const lines = content.split("\n")
+        const numberedLines = lines
+          .map((line, idx) => `${idx + 1}:${line}`)
+          .join("\n")
+        codebaseStr += `\n\n=== FILE: ${filePath} ===\n${numberedLines}`
+      }
+    } catch (error) {
+      console.error(`Failed to fetch ${filePath}:`, error)
+    }
+  }
+
+  return codebaseStr
+}
+
+
+// Alias functions for compatibility with existing code
+export const getCommits = getRecentCommits
+export const getTechStack = detectTechStack

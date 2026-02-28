@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { connectDB } from "@/lib/mongodb"
 import User from "@/models/User"
+import { deleteCached } from "@/lib/redis"
 
 // GET user profile
 export async function GET() {
@@ -38,7 +39,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { name, email, bio, location, blog } = body
+    const { name, email, bio, title, location, blog } = body
 
     await connectDB()
     
@@ -46,6 +47,7 @@ export async function PATCH(request: NextRequest) {
     if (name !== undefined) updateData.name = name
     if (email !== undefined) updateData.email = email
     if (bio !== undefined) updateData.bio = bio
+    if (title !== undefined) updateData.title = title
     if (location !== undefined) updateData.location = location
     if (blog !== undefined) updateData.blog = blog
 
@@ -57,6 +59,16 @@ export async function PATCH(request: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 })
+    }
+
+    // Invalidate Redis cache so fresh data is fetched
+    try {
+      await deleteCached(`user:basic:${session.user.githubId}`)
+      await deleteCached(`user:repos:${session.user.githubId}`)
+      console.log(`[Profile Update] Cache invalidated for user ${session.user.githubId}`)
+    } catch (cacheError) {
+      console.error("Error invalidating cache:", cacheError)
+      // Don't fail the request if cache invalidation fails
     }
 
     return NextResponse.json({ 

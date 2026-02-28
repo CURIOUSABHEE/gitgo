@@ -1,45 +1,5 @@
 import mongoose, { Schema, Document, Model } from "mongoose"
 
-export interface IResumeSkillGroup {
-  category: string
-  skills: string[]
-}
-
-export interface IResumeExperience {
-  title: string
-  company: string
-  duration: string
-  description: string
-}
-
-export interface IResumeEducation {
-  degree: string
-  institution: string
-  year: string
-  details?: string
-}
-
-export interface IResumeProject {
-  name: string
-  description: string
-  technologies: string[]
-  githubUrl?: string
-  duration?: string
-}
-
-export interface ILinkedInProfile {
-  url: string
-  headline?: string
-  summary?: string
-  skills?: string[]
-  experience?: {
-    title: string
-    company: string
-    duration: string
-  }[]
-  fetchedAt?: Date
-}
-
 export interface IUser extends Document {
   githubId: string
   login: string
@@ -47,6 +7,7 @@ export interface IUser extends Document {
   email: string
   avatar_url: string
   bio: string
+  title: string
   location: string
   blog: string
   company: string
@@ -58,34 +19,62 @@ export interface IUser extends Document {
   created_at: Date
   updated_at: Date
   lastSynced: Date
-  // Skills and languages
+  // New fields for skills and languages
   languages: string[]
   skills: string[]
   techStack: string[]
-  // Technology map
+  // Technology map: tracks which technologies were used in which projects
   technologyMap: {
     technology: string
     projects: Array<{
       repoName: string
       repoId: number
-      isPrimary: boolean
+      isPrimary: boolean // true if it's the main language of the repo
       lastUsed: Date
     }>
     totalProjects: number
     firstUsed: Date
     lastUsed: Date
   }[]
-  // Resume data
-  resumeFileName?: string
-  resumeUploadedAt?: Date
-  resumeCareerObjective?: string
-  resumeSkillGroups?: IResumeSkillGroup[]
-  resumeExperience?: IResumeExperience[]
-  resumeEducation?: IResumeEducation[]
-  resumeProjects?: IResumeProject[]
-  resumeRawText?: string
-  // LinkedIn data
-  linkedin?: ILinkedInProfile
+  // LinkedIn integration fields
+  linkedinId?: string
+  linkedinAccessToken?: string
+  linkedinRefreshToken?: string
+  linkedinTokenExpiry?: Date
+  linkedinProfile?: {
+    headline: string
+    summary: string
+    industry: string
+    profilePicture: string
+  }
+  linkedinExperience?: Array<{
+    company: string
+    title: string
+    startDate: Date
+    endDate?: Date
+    description: string
+    location: string
+    current: boolean
+  }>
+  linkedinEducation?: Array<{
+    school: string
+    degree: string
+    fieldOfStudy: string
+    startDate: Date
+    endDate?: Date
+    description: string
+  }>
+  linkedinSkills?: string[]
+  linkedinLastSynced?: Date
+  // Subscription fields
+  subscriptionPlan?: "free" | "starter" | "pro" | "enterprise"
+  subscriptionStatus?: "active" | "cancelled" | "expired" | "trial"
+  subscriptionStartDate?: Date
+  subscriptionEndDate?: Date
+  subscriptionId?: string // Razorpay subscription ID
+  paymentId?: string // Razorpay payment ID
+  routeAnalysisCount?: number // Daily route analysis count
+  routeAnalysisResetDate?: Date // When to reset the count
 }
 
 const UserSchema = new Schema<IUser>(
@@ -96,6 +85,7 @@ const UserSchema = new Schema<IUser>(
     email: { type: String, default: "" },
     avatar_url: { type: String, default: "" },
     bio: { type: String, default: "" },
+    title: { type: String, default: "" },
     location: { type: String, default: "" },
     blog: { type: String, default: "" },
     company: { type: String, default: "" },
@@ -106,7 +96,7 @@ const UserSchema = new Schema<IUser>(
     following: { type: Number, default: 0 },
     created_at: { type: Date },
     lastSynced: { type: Date, default: Date.now },
-    // Skills & languages
+    // New fields
     languages: [{ type: String }],
     skills: [{ type: String }],
     techStack: [{ type: String }],
@@ -127,57 +117,57 @@ const UserSchema = new Schema<IUser>(
         lastUsed: { type: Date, default: Date.now },
       },
     ],
-    // Resume data
-    resumeFileName: { type: String },
-    resumeUploadedAt: { type: Date },
-    resumeCareerObjective: { type: String },
-    resumeSkillGroups: [
-      {
-        category: { type: String, default: "" },
-        skills: [{ type: String }],
-      },
-    ],
-    resumeExperience: [
-      {
-        title: { type: String, default: "" },
-        company: { type: String, default: "" },
-        duration: { type: String, default: "" },
-        description: { type: String, default: "" },
-      },
-    ],
-    resumeEducation: [
-      {
-        degree: { type: String, default: "" },
-        institution: { type: String, default: "" },
-        year: { type: String, default: "" },
-        details: { type: String },
-      },
-    ],
-    resumeProjects: [
-      {
-        name: { type: String, default: "" },
-        description: { type: String, default: "" },
-        technologies: [{ type: String }],
-        githubUrl: { type: String },
-        duration: { type: String },
-      },
-    ],
-    resumeRawText: { type: String },
-    // LinkedIn data
-    linkedin: {
-      url: { type: String },
+    // LinkedIn integration fields
+    linkedinId: { type: String, sparse: true, index: true },
+    linkedinAccessToken: { type: String },
+    linkedinRefreshToken: { type: String },
+    linkedinTokenExpiry: { type: Date },
+    linkedinProfile: {
       headline: { type: String },
       summary: { type: String },
-      skills: [{ type: String }],
-      experience: [
-        {
-          title: { type: String },
-          company: { type: String },
-          duration: { type: String },
-        },
-      ],
-      fetchedAt: { type: Date },
+      industry: { type: String },
+      profilePicture: { type: String },
     },
+    linkedinExperience: [
+      {
+        company: { type: String },
+        title: { type: String },
+        startDate: { type: Date },
+        endDate: { type: Date },
+        description: { type: String },
+        location: { type: String },
+        current: { type: Boolean, default: false },
+      },
+    ],
+    linkedinEducation: [
+      {
+        school: { type: String },
+        degree: { type: String },
+        fieldOfStudy: { type: String },
+        startDate: { type: Date },
+        endDate: { type: Date },
+        description: { type: String },
+      },
+    ],
+    linkedinSkills: [{ type: String }],
+    linkedinLastSynced: { type: Date },
+    // Subscription fields
+    subscriptionPlan: {
+      type: String,
+      enum: ["free", "starter", "pro", "enterprise"],
+      default: "free",
+    },
+    subscriptionStatus: {
+      type: String,
+      enum: ["active", "cancelled", "expired", "trial"],
+      default: "active",
+    },
+    subscriptionStartDate: { type: Date },
+    subscriptionEndDate: { type: Date },
+    subscriptionId: { type: String },
+    paymentId: { type: String },
+    routeAnalysisCount: { type: Number, default: 0 },
+    routeAnalysisResetDate: { type: Date, default: Date.now },
   },
   {
     timestamps: true,

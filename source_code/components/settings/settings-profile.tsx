@@ -8,11 +8,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { useGitHub } from "@/hooks/use-github"
-import { useToast } from "@/hooks/use-toast"
+import toast from "react-hot-toast"
 
 export function SettingsProfile() {
   const { profile, loading, refreshProfile } = useGitHub()
-  const { toast } = useToast()
   const [saving, setSaving] = useState(false)
   
   // Local state for form fields
@@ -37,7 +36,7 @@ export function SettingsProfile() {
       setFormData({
         firstName: nameParts[0] || "",
         lastName: nameParts.slice(1).join(" ") || "",
-        title: profile.user.bio || "",
+        title: profile.user.title || "",
         username: profile.user.login || "",
         bio: profile.user.bio || "",
         email: profile.user.email || "",
@@ -64,32 +63,29 @@ export function SettingsProfile() {
           name: fullName,
           email: formData.email,
           bio: formData.bio,
+          title: formData.title,
           location: formData.location,
           blog: formData.website,
         }),
       })
 
       if (!response.ok) {
-        throw new Error("Failed to update profile")
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to update profile")
       }
 
       const data = await response.json()
       
-      // Refresh profile data to update UI
+      // Refresh profile data from database (not GitHub)
       await refreshProfile()
       
       setHasChanges(false)
-      toast({
-        title: "Profile updated",
-        description: "Your changes have been saved successfully.",
-      })
+      toast.success("Profile updated successfully!")
     } catch (error) {
       console.error("Error saving profile:", error)
-      toast({
-        title: "Update failed",
-        description: "Failed to save your changes. Please try again.",
-        variant: "destructive",
-      })
+      toast.error(
+        error instanceof Error ? error.message : "Failed to save your changes. Please try again."
+      )
     } finally {
       setSaving(false)
     }
@@ -275,7 +271,7 @@ export function SettingsProfile() {
                 setFormData({
                   firstName: nameParts[0] || "",
                   lastName: nameParts.slice(1).join(" ") || "",
-                  title: profile.user.bio || "",
+                  title: profile.user.title || "",
                   username: profile.user.login || "",
                   bio: profile.user.bio || "",
                   email: profile.user.email || "",

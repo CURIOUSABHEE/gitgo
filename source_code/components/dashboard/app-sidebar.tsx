@@ -14,6 +14,7 @@ import {
   TrendingUp,
   Layers,
   Users,
+  Search,
 } from "lucide-react"
 import {
   Sidebar,
@@ -48,6 +49,11 @@ const mainNav = [
     icon: FolderGit2,
   },
   {
+    title: "Analyze Repo",
+    href: "/dashboard/analyze",
+    icon: Search,
+  },
+  {
     title: "Community",
     href: "/dashboard/community",
     icon: Users,
@@ -67,7 +73,7 @@ const filters = [
   },
   {
     title: "Trending",
-    href: "/dashboard?filter=trending",
+    href: "/dashboard/trending",
     icon: TrendingUp,
   },
 ]
