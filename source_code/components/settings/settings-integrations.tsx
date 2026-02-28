@@ -3,19 +3,17 @@
 import { useEffect, useState } from "react"
 import { useSession } from "next-auth/react"
 import { signIn } from "next-auth/react"
-import { RefreshCw, Loader2 } from "lucide-react"
+import {
+  RefreshCw,
+  Loader2,
+  CheckCircle2,
+  ExternalLink,
+  X,
+  AlertCircle,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { useGitHub } from "@/hooks/use-github"
-
-interface Integration {
-  name: string
-  description: string
-  connected: boolean
-  icon: React.ReactNode
-  username?: string
-  lastSynced?: string
-}
 
 function GitHubIcon() {
   return (
@@ -33,11 +31,53 @@ function LinkedInIcon() {
   )
 }
 
+interface LinkedInData {
+  url: string
+  username?: string
+  fetchedAt?: string
+}
+
 export function SettingsIntegrations() {
   const { data: session } = useSession()
   const { profile, loading, refreshProfile } = useGitHub()
   const [syncing, setSyncing] = useState(false)
   const [lastSyncTime, setLastSyncTime] = useState<string>("Never")
+
+  // LinkedIn state
+  const [linkedinData, setLinkedinData] = useState<LinkedInData | null>(null)
+  const [linkedinUrl, setLinkedinUrl] = useState("")
+  const [showLinkedinInput, setShowLinkedinInput] = useState(false)
+  const [linkedinSaving, setLinkedinSaving] = useState(false)
+  const [linkedinLoading, setLinkedinLoading] = useState(true)
+  const [linkedinError, setLinkedinError] = useState<string | null>(null)
+  const [linkedinDisconnecting, setLinkedinDisconnecting] = useState(false)
+
+  // Fetch LinkedIn data on mount
+  useEffect(() => {
+    const fetchLinkedin = async () => {
+      try {
+        const res = await fetch("/api/user/linkedin")
+        if (res.ok) {
+          const json = await res.json()
+          if (json.data?.url) {
+            const urlObj = new URL(json.data.url)
+            const username =
+              urlObj.pathname.split("/in/")[1]?.replace(/\//g, "") || ""
+            setLinkedinData({
+              url: json.data.url,
+              username,
+              fetchedAt: json.data.fetchedAt,
+            })
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch LinkedIn data:", err)
+      } finally {
+        setLinkedinLoading(false)
+      }
+    }
+    fetchLinkedin()
+  }, [])
 
   useEffect(() => {
     if (profile) {
@@ -61,24 +101,55 @@ export function SettingsIntegrations() {
     signIn("github", { callbackUrl: "/dashboard/settings" })
   }
 
-  const integrations: Integration[] = [
-    {
-      name: "GitHub",
-      description: "Used to analyze your repositories and find matching open source projects.",
-      connected: !!session?.accessToken,
-      icon: <GitHubIcon />,
-      username: profile?.user.login,
-      lastSynced: lastSyncTime,
-    },
-    {
-      name: "LinkedIn",
-      description: "Import your experience and skills to improve match accuracy.",
-      connected: false,
-      icon: <LinkedInIcon />,
-    },
-  ]
+  const handleLinkedinSave = async () => {
+    if (!linkedinUrl.trim()) {
+      setLinkedinError("Please enter a LinkedIn URL")
+      return
+    }
 
-  if (loading) {
+    setLinkedinSaving(true)
+    setLinkedinError(null)
+
+    try {
+      const res = await fetch("/api/user/linkedin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: linkedinUrl.trim() }),
+      })
+
+      if (!res.ok) {
+        const json = await res.json()
+        throw new Error(json.error || "Failed to save")
+      }
+
+      const json = await res.json()
+      setLinkedinData({
+        url: json.data.url,
+        username: json.data.username,
+        fetchedAt: json.data.fetchedAt,
+      })
+      setShowLinkedinInput(false)
+      setLinkedinUrl("")
+    } catch (err) {
+      setLinkedinError(err instanceof Error ? err.message : "Failed to save")
+    } finally {
+      setLinkedinSaving(false)
+    }
+  }
+
+  const handleLinkedinDisconnect = async () => {
+    setLinkedinDisconnecting(true)
+    try {
+      await fetch("/api/user/linkedin", { method: "DELETE" })
+      setLinkedinData(null)
+    } catch (err) {
+      console.error("Failed to disconnect LinkedIn:", err)
+    } finally {
+      setLinkedinDisconnecting(false)
+    }
+  }
+
+  if (loading || linkedinLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -98,21 +169,80 @@ export function SettingsIntegrations() {
       <Separator className="my-6" />
 
       <div className="flex flex-col gap-4">
-        {integrations.map((integration) => (
-          <div
-            key={integration.name}
-            className="flex items-center justify-between rounded-xl border border-border bg-card p-5"
-          >
+        {/* GitHub Integration */}
+        <div className="flex items-center justify-between rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary text-foreground">
+              <GitHubIcon />
+            </div>
+            <div>
+              <div className="flex items-center gap-2.5">
+                <p className="text-sm font-semibold text-foreground">GitHub</p>
+                {session?.accessToken ? (
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-primary">
+                    <span className="h-2 w-2 rounded-full bg-primary" />
+                    Connected
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
+                    Not connected
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Used to analyze your repositories and find matching open source
+                projects.
+              </p>
+              {profile?.user.login && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Signed in as{" "}
+                  <span className="font-medium text-foreground">
+                    @{profile.user.login}
+                  </span>
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {session?.accessToken ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="h-8 gap-1.5 text-xs"
+                onClick={handleResync}
+                disabled={syncing}
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`}
+                />
+                {syncing ? "Syncing..." : "Re-sync Data"}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="h-8 text-xs"
+                onClick={handleGitHubConnect}
+              >
+                Connect
+              </Button>
+            )}
+          </div>
+        </div>
+
+        {/* LinkedIn Integration */}
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-secondary text-foreground">
-                {integration.icon}
+                <LinkedInIcon />
               </div>
               <div>
                 <div className="flex items-center gap-2.5">
                   <p className="text-sm font-semibold text-foreground">
-                    {integration.name}
+                    LinkedIn
                   </p>
-                  {integration.connected ? (
+                  {linkedinData ? (
                     <span className="flex items-center gap-1.5 text-xs font-medium text-primary">
                       <span className="h-2 w-2 rounded-full bg-primary" />
                       Connected
@@ -125,52 +255,119 @@ export function SettingsIntegrations() {
                   )}
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {integration.description}
+                  Import your experience and skills to improve match accuracy.
                 </p>
-                {integration.username && (
+                {linkedinData?.username && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Signed in as{" "}
-                    <span className="font-medium text-foreground">
-                      @{integration.username}
-                    </span>
+                    Linked as{" "}
+                    <a
+                      href={linkedinData.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-medium text-foreground hover:text-primary"
+                    >
+                      {linkedinData.username}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
                   </p>
                 )}
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {integration.connected ? (
+              {linkedinData ? (
                 <Button
                   variant="secondary"
                   size="sm"
                   className="h-8 gap-1.5 text-xs"
-                  onClick={handleResync}
-                  disabled={syncing}
+                  onClick={handleLinkedinDisconnect}
+                  disabled={linkedinDisconnecting}
                 >
-                  <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-                  {syncing ? "Syncing..." : "Re-sync Data"}
+                  {linkedinDisconnecting ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <X className="h-3.5 w-3.5" />
+                  )}
+                  Disconnect
                 </Button>
               ) : (
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   className="h-8 text-xs"
-                  onClick={integration.name === "GitHub" ? handleGitHubConnect : undefined}
+                  onClick={() => setShowLinkedinInput(true)}
                 >
                   Connect
                 </Button>
               )}
             </div>
           </div>
-        ))}
+
+          {/* LinkedIn URL input */}
+          {showLinkedinInput && !linkedinData && (
+            <div className="mt-4 border-t border-border pt-4">
+              <label className="text-xs font-medium text-foreground">
+                LinkedIn Profile URL
+              </label>
+              <div className="mt-2 flex gap-2">
+                <input
+                  type="url"
+                  value={linkedinUrl}
+                  onChange={(e) => {
+                    setLinkedinUrl(e.target.value)
+                    setLinkedinError(null)
+                  }}
+                  placeholder="https://linkedin.com/in/your-profile"
+                  className="h-9 flex-1 rounded-lg border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleLinkedinSave()
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="h-9 text-xs"
+                  onClick={handleLinkedinSave}
+                  disabled={linkedinSaving}
+                >
+                  {linkedinSaving ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" />
+                  ) : (
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                  )}
+                  Save
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-9 text-xs"
+                  onClick={() => {
+                    setShowLinkedinInput(false)
+                    setLinkedinUrl("")
+                    setLinkedinError(null)
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+              {linkedinError && (
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-destructive">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  {linkedinError}
+                </div>
+              )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                Paste your LinkedIn profile URL (e.g., linkedin.com/in/johndoe)
+              </p>
+            </div>
+          )}
+        </div>
       </div>
 
       <Separator className="my-6" />
 
       <div className="rounded-lg border border-border bg-secondary/30 px-4 py-3">
         <p className="text-xs text-muted-foreground">
-          {session?.accessToken 
-            ? `Last synced: ${lastSyncTime}. gitgo only reads public repository data and does not modify any of your accounts.`
-            : "Connect your GitHub account to start syncing your data."
-          }
+          {session?.accessToken
+            ? `Last synced: ${lastSyncTime}. gitgo only reads public data and does not modify any of your accounts.`
+            : "Connect your accounts to start syncing your data."}
         </p>
       </div>
     </div>

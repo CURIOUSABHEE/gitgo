@@ -1,5 +1,45 @@
 import mongoose, { Schema, Document, Model } from "mongoose"
 
+export interface IResumeSkillGroup {
+  category: string
+  skills: string[]
+}
+
+export interface IResumeExperience {
+  title: string
+  company: string
+  duration: string
+  description: string
+}
+
+export interface IResumeEducation {
+  degree: string
+  institution: string
+  year: string
+  details?: string
+}
+
+export interface IResumeProject {
+  name: string
+  description: string
+  technologies: string[]
+  githubUrl?: string
+  duration?: string
+}
+
+export interface ILinkedInProfile {
+  url: string
+  headline?: string
+  summary?: string
+  skills?: string[]
+  experience?: {
+    title: string
+    company: string
+    duration: string
+  }[]
+  fetchedAt?: Date
+}
+
 export interface IUser extends Document {
   githubId: string
   login: string
@@ -18,23 +58,34 @@ export interface IUser extends Document {
   created_at: Date
   updated_at: Date
   lastSynced: Date
-  // New fields for skills and languages
+  // Skills and languages
   languages: string[]
   skills: string[]
   techStack: string[]
-  // Technology map: tracks which technologies were used in which projects
+  // Technology map
   technologyMap: {
     technology: string
     projects: Array<{
       repoName: string
       repoId: number
-      isPrimary: boolean // true if it's the main language of the repo
+      isPrimary: boolean
       lastUsed: Date
     }>
     totalProjects: number
     firstUsed: Date
     lastUsed: Date
   }[]
+  // Resume data
+  resumeFileName?: string
+  resumeUploadedAt?: Date
+  resumeCareerObjective?: string
+  resumeSkillGroups?: IResumeSkillGroup[]
+  resumeExperience?: IResumeExperience[]
+  resumeEducation?: IResumeEducation[]
+  resumeProjects?: IResumeProject[]
+  resumeRawText?: string
+  // LinkedIn data
+  linkedin?: ILinkedInProfile
 }
 
 const UserSchema = new Schema<IUser>(
@@ -55,7 +106,7 @@ const UserSchema = new Schema<IUser>(
     following: { type: Number, default: 0 },
     created_at: { type: Date },
     lastSynced: { type: Date, default: Date.now },
-    // New fields
+    // Skills & languages
     languages: [{ type: String }],
     skills: [{ type: String }],
     techStack: [{ type: String }],
@@ -76,6 +127,57 @@ const UserSchema = new Schema<IUser>(
         lastUsed: { type: Date, default: Date.now },
       },
     ],
+    // Resume data
+    resumeFileName: { type: String },
+    resumeUploadedAt: { type: Date },
+    resumeCareerObjective: { type: String },
+    resumeSkillGroups: [
+      {
+        category: { type: String, default: "" },
+        skills: [{ type: String }],
+      },
+    ],
+    resumeExperience: [
+      {
+        title: { type: String, default: "" },
+        company: { type: String, default: "" },
+        duration: { type: String, default: "" },
+        description: { type: String, default: "" },
+      },
+    ],
+    resumeEducation: [
+      {
+        degree: { type: String, default: "" },
+        institution: { type: String, default: "" },
+        year: { type: String, default: "" },
+        details: { type: String },
+      },
+    ],
+    resumeProjects: [
+      {
+        name: { type: String, default: "" },
+        description: { type: String, default: "" },
+        technologies: [{ type: String }],
+        githubUrl: { type: String },
+        duration: { type: String },
+      },
+    ],
+    resumeRawText: { type: String },
+    // LinkedIn data
+    linkedin: {
+      url: { type: String },
+      headline: { type: String },
+      summary: { type: String },
+      skills: [{ type: String }],
+      experience: [
+        {
+          title: { type: String },
+          company: { type: String },
+          duration: { type: String },
+        },
+      ],
+      fetchedAt: { type: Date },
+    },
   },
   {
     timestamps: true,
